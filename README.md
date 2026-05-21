@@ -9,7 +9,7 @@
 |------|--------|
 | Pull request | _Add your PR URL after creating it on GitHub_ |
 | Store URL | https://whishlistapp-fkqsledg.myshopify.com |
-| Storefront password | _Online Store → Preferences → Password protection_ |
+| Storefront password | `test` |
 | Collaborator code | **7259** (Settings → Users → Store security) |
 | Backend (Vercel) | https://brainx-wishlist-api.vercel.app |
 
