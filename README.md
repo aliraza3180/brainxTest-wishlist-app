@@ -7,7 +7,7 @@
 
 | Item | Value |
 |------|--------|
-| Pull request | _Add your PR URL after creating it on GitHub_ |
+| Pull request | https://github.com/aliraza3180/brainxTest-wishlist-app/pull/1 |
 | Store URL | https://whishlistapp-fkqsledg.myshopify.com |
 | Storefront password | `test` |
 | Collaborator code | **7259** (Settings → Users → Store security) |
