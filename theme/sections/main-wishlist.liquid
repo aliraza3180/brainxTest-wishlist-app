@@ -1,0 +1,212 @@
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{%- liquid
+  assign api_base = shop.metafields.custom.wishlist_api_url.value | default: shop.metafields.custom.wishlist_api_url
+  if api_base == blank
+    assign api_base = section.settings.api_base_url | strip
+  endif
+  if api_base == blank
+    assign api_base = 'https://brainx-wishlist-api.vercel.app'
+  endif
+  assign api_secret = shop.metafields.custom.wishlist_api_secret.value | default: shop.metafields.custom.wishlist_api_secret
+  assign customer_id_str = customer.id | append: ''
+  if customer_id_str contains 'gid://'
+    assign customer_gid = customer_id_str
+  else
+    assign customer_gid = customer_id_str | prepend: 'gid://shopify/Customer/'
+  endif
+-%}
+
+<section
+  id="Wishlist-{{ section.id }}"
+  class="wishlist-page section-{{ section.id }}-padding color-{{ section.settings.color_scheme }} gradient"
+  data-wishlist-page
+  data-api-base="{{ api_base | escape }}"
+  data-api-secret="{{ api_secret | escape }}"
+  data-customer-gid="{{ customer_gid | escape }}"
+  style="--wishlist-max-width: {{ section.settings.max_width }}px;"
+>
+  <div class="page-width wishlist-page__inner">
+    {%- if section.settings.heading != blank -%}
+      <h1 class="wishlist-page__heading h1">{{ section.settings.heading }}</h1>
+    {%- endif -%}
+
+    {%- unless customer -%}
+      <div class="wishlist-page__message wishlist-page__message--guest">
+        <p>{{ section.settings.guest_message }}</p>
+        <a href="{{ routes.account_login_url }}" class="button button--primary">
+          {{ section.settings.login_label }}
+        </a>
+      </div>
+    {%- else -%}
+      <noscript>
+        <div class="wishlist-page__message wishlist-page__message--noscript">
+          <p>{{ section.settings.noscript_message }}</p>
+        </div>
+      </noscript>
+
+      <div class="wishlist-page__loading wishlist-skeleton" data-wishlist-loading aria-hidden="true">
+        {%- for i in (1..3) -%}
+          <div class="wishlist-skeleton__card">
+            <div class="wishlist-skeleton__image"></div>
+            <div class="wishlist-skeleton__line"></div>
+            <div class="wishlist-skeleton__line wishlist-skeleton__line--short"></div>
+          </div>
+        {%- endfor -%}
+      </div>
+
+      <div class="wishlist-page__empty" data-wishlist-empty hidden>
+        <p>{{ section.settings.empty_message }}</p>
+        <a href="{{ routes.all_products_collection_url }}" class="button button--primary">
+          {{ section.settings.continue_shopping_label }}
+        </a>
+      </div>
+
+      <ul class="wishlist-page__grid" data-wishlist-grid role="list" hidden></ul>
+    {%- endunless -%}
+  </div>
+</section>
+
+<script src="{{ 'wishlist.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Wishlist",
+  "tag": "section",
+  "class": "section-wishlist",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "My Wishlist"
+    },
+    {
+      "type": "url",
+      "id": "api_base_url",
+      "label": "Wishlist API base URL",
+      "info": "Your deployed backend URL, e.g. https://your-app.vercel.app"
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "min": 800,
+      "max": 1600,
+      "step": 50,
+      "unit": "px",
+      "label": "Max content width",
+      "default": 1200
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "header",
+      "content": "Section padding"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "label": "Padding top (desktop)",
+      "default": 36
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "label": "Padding bottom (desktop)",
+      "default": 36
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "label": "Padding top (mobile)",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "unit": "px",
+      "label": "Padding bottom (mobile)",
+      "default": 24
+    },
+    {
+      "type": "header",
+      "content": "Messages"
+    },
+    {
+      "type": "text",
+      "id": "guest_message",
+      "label": "Guest message",
+      "default": "Sign in to view and manage your wishlist."
+    },
+    {
+      "type": "text",
+      "id": "login_label",
+      "label": "Login button label",
+      "default": "Sign in"
+    },
+    {
+      "type": "text",
+      "id": "empty_message",
+      "label": "Empty wishlist message",
+      "default": "Your wishlist is empty. Browse products and save your favorites."
+    },
+    {
+      "type": "text",
+      "id": "continue_shopping_label",
+      "label": "Continue shopping label",
+      "default": "Continue shopping"
+    },
+    {
+      "type": "text",
+      "id": "noscript_message",
+      "label": "No-JavaScript message",
+      "default": "Enable JavaScript to view your wishlist."
+    }
+  ]
+}
+{% endschema %}
+
+{% style %}
+  .section-{{ section.id }}-padding {
+    padding-top: {{ section.settings.padding_top_mobile }}px;
+    padding-bottom: {{ section.settings.padding_bottom_mobile }}px;
+  }
+
+  @media screen and (min-width: 750px) {
+    .section-{{ section.id }}-padding {
+      padding-top: {{ section.settings.padding_top }}px;
+      padding-bottom: {{ section.settings.padding_bottom }}px;
+    }
+  }
+{% endstyle %}
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.WishlistApp && typeof window.WishlistApp.init === 'function') {
+      window.WishlistApp.init();
+    }
+  });
+</script>

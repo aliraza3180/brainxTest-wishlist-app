@@ -1,0 +1,51 @@
+{% doc %}
+  Renders a wishlist toggle button for a product.
+
+  @param {object} product - Product object (required)
+  @param {string} [classes] - Additional CSS classes (optional)
+
+  @example
+    {% render 'wishlist-button', product: product %}
+{% enddoc %}
+
+{%- if customer and product -%}
+  {{ 'wishlist.css' | asset_url | stylesheet_tag }}
+  <script src="{{ 'wishlist.js' | asset_url }}" defer></script>
+  {%- liquid
+    assign product_id_str = product.id | append: ''
+    if product_id_str contains 'gid://'
+      assign product_gid = product_id_str
+    else
+      assign product_gid = product_id_str | prepend: 'gid://shopify/Product/'
+    endif
+    assign customer_id_str = customer.id | append: ''
+    if customer_id_str contains 'gid://'
+      assign customer_gid = customer_id_str
+    else
+      assign customer_gid = customer_id_str | prepend: 'gid://shopify/Customer/'
+    endif
+    assign extra_classes = classes | default: ''
+    assign api_base = shop.metafields.custom.wishlist_api_url.value | default: shop.metafields.custom.wishlist_api_url
+    if api_base == blank and section.settings.api_base_url != blank
+      assign api_base = section.settings.api_base_url
+    endif
+    if api_base == blank
+      assign api_base = 'https://brainx-wishlist-api.vercel.app'
+    endif
+    assign api_secret = shop.metafields.custom.wishlist_api_secret.value | default: shop.metafields.custom.wishlist_api_secret
+  -%}
+  <button
+    type="button"
+    class="wishlist-button button button--secondary {{ extra_classes }}"
+    data-wishlist-button
+    data-product-gid="{{ product_gid }}"
+    data-customer-gid="{{ customer_gid }}"
+    data-api-base="{{ api_base | escape }}"
+    data-api-secret="{{ api_secret | escape }}"
+    data-state="idle"
+    aria-pressed="false"
+    aria-label="Add to wishlist"
+  >
+    <span class="wishlist-button__label" data-wishlist-label>Add to Wishlist</span>
+  </button>
+{%- endif -%}
