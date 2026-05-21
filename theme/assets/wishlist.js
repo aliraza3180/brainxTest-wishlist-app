@@ -15,8 +15,17 @@
   const buttonStates = new Map();
   const inflightRequests = new Map();
   let pageConfig = null;
-  let toastEl = null;
   let observer = null;
+
+  const TOAST_DURATION = 4200;
+  const TOAST_ICONS = {
+    success:
+      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+    error:
+      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+    info:
+      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>',
+  };
 
   const LABELS = {
     add: 'Add to Wishlist',
@@ -73,21 +82,107 @@
     return normalizeGid(apiId, 'Product') === normalizeGid(buttonGid, 'Product');
   }
 
-  function showToast(message, isError) {
-    if (!toastEl) {
-      toastEl = document.createElement('div');
-      toastEl.className = 'wishlist-toast';
-      toastEl.setAttribute('role', 'status');
-      toastEl.setAttribute('aria-live', 'polite');
-      document.body.appendChild(toastEl);
+  function ensureToastContainer() {
+    let container = document.getElementById('wishlist-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'wishlist-toast-container';
+      container.className = 'wishlist-toast-container';
+      container.setAttribute('aria-live', 'polite');
+      container.setAttribute('aria-relevant', 'additions');
+      document.body.appendChild(container);
     }
-    toastEl.textContent = message;
-    toastEl.classList.toggle('wishlist-toast--error', Boolean(isError));
-    toastEl.classList.add('wishlist-toast--visible');
-    clearTimeout(showToast._timer);
-    showToast._timer = setTimeout(function () {
-      toastEl.classList.remove('wishlist-toast--visible');
-    }, 3500);
+    return container;
+  }
+
+  /**
+   * @param {string} message
+   * @param {'success'|'error'|'info'|boolean} [typeOrError] — true = error (legacy)
+   */
+  function showToast(message, typeOrError) {
+    let type = 'info';
+    if (typeOrError === true) type = 'error';
+    else if (typeof typeOrError === 'string') type = typeOrError;
+
+    const container = ensureToastContainer();
+    const toast = document.createElement('div');
+    toast.className = 'wishlist-toast wishlist-toast--' + type;
+    toast.setAttribute('role', 'alert');
+
+    const icon = document.createElement('div');
+    icon.className = 'wishlist-toast__icon';
+    icon.innerHTML = TOAST_ICONS[type] || TOAST_ICONS.info;
+
+    const body = document.createElement('div');
+    body.className = 'wishlist-toast__body';
+    const text = document.createElement('p');
+    text.className = 'wishlist-toast__message';
+    text.textContent = message;
+    body.appendChild(text);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'wishlist-toast__close';
+    closeBtn.setAttribute('aria-label', 'Dismiss notification');
+    closeBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+
+    const progress = document.createElement('div');
+    progress.className = 'wishlist-toast__progress';
+    progress.style.animationDuration = TOAST_DURATION + 'ms';
+
+    toast.appendChild(icon);
+    toast.appendChild(body);
+    toast.appendChild(closeBtn);
+    toast.appendChild(progress);
+    container.prepend(toast);
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        toast.classList.add('wishlist-toast--visible');
+      });
+    });
+
+    let remaining = TOAST_DURATION;
+    let dismissAt = Date.now() + remaining;
+    let dismissTimer = null;
+
+    function dismiss() {
+      if (toast.classList.contains('wishlist-toast--exit')) return;
+      toast.classList.remove('wishlist-toast--visible');
+      toast.classList.add('wishlist-toast--exit');
+      toast.addEventListener(
+        'transitionend',
+        function () {
+          toast.remove();
+        },
+        { once: true }
+      );
+      setTimeout(function () {
+        if (toast.parentNode) toast.remove();
+      }, 400);
+    }
+
+    function scheduleDismiss() {
+      clearTimeout(dismissTimer);
+      dismissTimer = setTimeout(dismiss, remaining);
+    }
+
+    closeBtn.addEventListener('click', dismiss);
+
+    toast.addEventListener('mouseenter', function () {
+      clearTimeout(dismissTimer);
+      remaining = Math.max(0, dismissAt - Date.now());
+      progress.style.animationPlayState = 'paused';
+    });
+
+    toast.addEventListener('mouseleave', function () {
+      dismissAt = Date.now() + remaining;
+      progress.style.animationPlayState = 'running';
+      scheduleDismiss();
+    });
+
+    scheduleDismiss();
   }
 
   function formatMoney(amount, currencyCode) {
@@ -244,17 +339,25 @@
       if (btn) setButtonUi(btn, 'idle', inList);
       buttonStates.set(normalizedGid, inList ? 'added' : 'idle');
       dispatchUpdated({ productGid: normalizedGid, wishlist: data.wishlist || [] });
+
+      if (inList) {
+        showToast('Added to your wishlist', 'success');
+      } else {
+        showToast('Removed from your wishlist', 'success');
+      }
     } catch (err) {
       if (err.status === 409 && err.payload && err.payload.error === 'PRODUCT_ALREADY_IN_WISHLIST') {
         if (btn) setButtonUi(btn, 'idle', true);
         buttonStates.set(normalizedGid, 'added');
         dispatchUpdated({ productGid: normalizedGid, wishlist: [] });
+        showToast('This product is already in your wishlist', 'info');
         return;
       }
       if (err.status === 404 && err.payload && err.payload.error === 'PRODUCT_NOT_IN_WISHLIST') {
         if (btn) setButtonUi(btn, 'idle', false);
         buttonStates.set(normalizedGid, 'idle');
         dispatchUpdated({ productGid: normalizedGid, wishlist: [] });
+        showToast('Removed from your wishlist', 'success');
         return;
       }
       if (btn) setButtonUi(btn, 'idle', wasAdded);
@@ -444,7 +547,7 @@
         openCartDrawer();
       }
 
-      showToast('Added to cart');
+      showToast('Added to cart', 'success');
     } catch (err) {
       showToast(err.message || 'Could not add to cart', true);
       console.error('[WishlistApp]', err);
