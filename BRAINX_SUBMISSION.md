@@ -7,7 +7,7 @@ Fill in the links below before you email HR / the reviewer.
 
 | Item | Your value |
 |------|------------|
-| GitHub PR | _paste PR URL here_ |
+| GitHub PR | Create here: https://github.com/aliraza3180/brainxTest-wishlist-app/pull/new/feat/wishlist-mvp — then paste `/pull/1` URL |
 | Store URL | https://whishlistapp-fkqsledg.myshopify.com |
 | Store password | _paste storefront password here_ |
 | Collaborator code | _Partners → Stores → your dev store → collaborator request code_ |
