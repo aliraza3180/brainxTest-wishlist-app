@@ -193,7 +193,7 @@ curl -X DELETE http://localhost:3000/api/wishlist/remove \
 
 1. Open https://whishlistapp-fkqsledg.myshopify.com — password `test`.
 2. Log in as a customer (or create one).
-3. Open any product → click **Add to Wishlist** → reload → button now says **Remove from Wishlist**.
+3. Open any product → click **Add to Wishlist** → button switches to **Remove from Wishlist**.
 4. Open **/pages/wishlist** → product appears → **Add to Cart** works.
 5. Click **Remove** on the wishlist page → item disappears, customer metafield `custom.wishlist` updates in admin.
 
