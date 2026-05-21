@@ -20,12 +20,15 @@
   const TOAST_DURATION = 4200;
   const TOAST_ICONS = {
     success:
-      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"/><path d="m6.5 10.2 2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     error:
-      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M10 6v4.5M10 13.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     info:
-      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>',
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.5V14M10 6.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   };
+
+  const CLOSE_ICON =
+    '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
   const LABELS = {
     add: 'Add to Wishlist',
@@ -96,18 +99,28 @@
   }
 
   /**
-   * @param {string} message
+   * @param {string|{title?: string, message: string}} input
    * @param {'success'|'error'|'info'|boolean} [typeOrError] — true = error (legacy)
    */
-  function showToast(message, typeOrError) {
+  function showToast(input, typeOrError) {
     let type = 'info';
     if (typeOrError === true) type = 'error';
     else if (typeof typeOrError === 'string') type = typeOrError;
 
+    let title = '';
+    let message = '';
+    if (typeof input === 'string') {
+      message = input;
+    } else if (input && typeof input === 'object') {
+      title = input.title || '';
+      message = input.message || '';
+    }
+    if (!message && !title) return;
+
     const container = ensureToastContainer();
     const toast = document.createElement('div');
     toast.className = 'wishlist-toast wishlist-toast--' + type;
-    toast.setAttribute('role', 'alert');
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
     const icon = document.createElement('div');
     icon.className = 'wishlist-toast__icon';
@@ -115,17 +128,26 @@
 
     const body = document.createElement('div');
     body.className = 'wishlist-toast__body';
-    const text = document.createElement('p');
-    text.className = 'wishlist-toast__message';
-    text.textContent = message;
-    body.appendChild(text);
+    if (!title) body.classList.add('wishlist-toast__body--single');
+
+    if (title) {
+      const titleEl = document.createElement('p');
+      titleEl.className = 'wishlist-toast__title';
+      titleEl.textContent = title;
+      body.appendChild(titleEl);
+    }
+    if (message) {
+      const msgEl = document.createElement('p');
+      msgEl.className = 'wishlist-toast__message';
+      msgEl.textContent = message;
+      body.appendChild(msgEl);
+    }
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'wishlist-toast__close';
     closeBtn.setAttribute('aria-label', 'Dismiss notification');
-    closeBtn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+    closeBtn.innerHTML = CLOSE_ICON;
 
     const progress = document.createElement('div');
     progress.className = 'wishlist-toast__progress';
@@ -341,23 +363,29 @@
       dispatchUpdated({ productGid: normalizedGid, wishlist: data.wishlist || [] });
 
       if (inList) {
-        showToast('Added to your wishlist', 'success');
+        showToast({ title: 'Added to wishlist', message: 'Saved to your account for later.' }, 'success');
       } else {
-        showToast('Removed from your wishlist', 'success');
+        showToast({ title: 'Removed from wishlist', message: 'The item is no longer saved.' }, 'success');
       }
     } catch (err) {
       if (err.status === 409 && err.payload && err.payload.error === 'PRODUCT_ALREADY_IN_WISHLIST') {
         if (btn) setButtonUi(btn, 'idle', true);
         buttonStates.set(normalizedGid, 'added');
         dispatchUpdated({ productGid: normalizedGid, wishlist: [] });
-        showToast('This product is already in your wishlist', 'info');
+        showToast(
+          { title: 'Already in wishlist', message: 'This product is already saved.' },
+          'info'
+        );
         return;
       }
       if (err.status === 404 && err.payload && err.payload.error === 'PRODUCT_NOT_IN_WISHLIST') {
         if (btn) setButtonUi(btn, 'idle', false);
         buttonStates.set(normalizedGid, 'idle');
         dispatchUpdated({ productGid: normalizedGid, wishlist: [] });
-        showToast('Removed from your wishlist', 'success');
+        showToast(
+          { title: 'Removed from wishlist', message: 'The item is no longer saved.' },
+          'success'
+        );
         return;
       }
       if (btn) setButtonUi(btn, 'idle', wasAdded);
@@ -547,7 +575,7 @@
         openCartDrawer();
       }
 
-      showToast('Added to cart', 'success');
+      showToast({ title: 'Added to cart', message: 'Open the cart to review your items.' }, 'success');
     } catch (err) {
       showToast(err.message || 'Could not add to cart', true);
       console.error('[WishlistApp]', err);
