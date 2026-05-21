@@ -42,6 +42,19 @@ app.use(express.json());
 app.use(logger);
 app.use('/api', rateLimiter);
 
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'BrainX Wishlist API',
+    status: 'running',
+    health: '/health',
+    endpoints: {
+      getWishlist: 'GET /api/wishlist?customerId=gid://shopify/Customer/{id}',
+      add: 'POST /api/wishlist/add — body: { customerId, productId }',
+      remove: 'DELETE /api/wishlist/remove — body: { customerId, productId }',
+    },
+  });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
