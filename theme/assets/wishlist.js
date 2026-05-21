@@ -345,41 +345,54 @@
     return li;
   }
 
-  async function addToCart(handle, btn) {
-    btn.disabled = true;
-    try {
-      const productRes = await fetch('/products/' + handle + '.js');
-      if (!productRes.ok) throw new Error('Could not load product');
-      const product = await productRes.json();
-      const variant =
-        (product.variants &&
-          product.variants.find(function (v) {
-            return v.available;
-          })) ||
-        (product.variants && product.variants[0]);
-      if (!variant) throw new Error('No variant available');
+  function getCartDrawer() {
+    return document.querySelector('cart-drawer');
+  }
 
-      const cartRoot = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
-      const addRes = await fetch(cartRoot + 'cart/add.js', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: [{ id: variant.id, quantity: 1 }] }),
+  /** Section ids Dawn expects when re-rendering the drawer (same as product-form.js). */
+  function getCartSectionIds() {
+    const drawer = getCartDrawer();
+    if (drawer && typeof drawer.getSectionsToRender === 'function') {
+      return drawer.getSectionsToRender().map(function (section) {
+        return section.id;
       });
-      if (!addRes.ok) throw new Error('Could not add to cart');
+    }
+    return ['cart-drawer', 'cart-icon-bubble'];
+  }
 
-      await refreshCartDrawer();
-      showToast('Added to cart');
-    } catch (err) {
-      showToast(err.message || 'Could not add to cart', true);
-      console.error('[WishlistApp]', err);
-    } finally {
-      btn.disabled = false;
+  /**
+   * Dawn: cart-drawer.renderContents() updates sections and opens the drawer.
+   * Falls back to manual section HTML swap + open() on older themes.
+   */
+  function updateCartDrawer(cartResponse) {
+    const drawer = getCartDrawer();
+    if (!drawer) return false;
+
+    if (cartResponse && cartResponse.sections && typeof drawer.renderContents === 'function') {
+      drawer.classList.remove('is-empty');
+      drawer.renderContents(cartResponse);
+      return true;
+    }
+
+    return false;
+  }
+
+  function openCartDrawer() {
+    const drawer = getCartDrawer();
+    if (!drawer) return;
+    drawer.classList.remove('is-empty');
+    if (typeof drawer.open === 'function') {
+      drawer.open();
+    } else {
+      drawer.classList.add('active', 'animate');
+      document.body.classList.add('overflow-hidden');
     }
   }
 
-  async function refreshCartDrawer() {
-    const sections = ['cart-drawer', 'cart-icon-bubble'];
-    const url = '/?sections=' + sections.join(',');
+  async function refreshCartDrawerSections() {
+    const sections = getCartSectionIds();
+    const cartRoot = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
+    const url = cartRoot + '?sections=' + sections.join(',');
     try {
       const res = await fetch(url);
       if (!res.ok) return;
@@ -390,9 +403,53 @@
           el.innerHTML = html[id];
         }
       });
-      document.dispatchEvent(new CustomEvent('cart:refresh'));
     } catch (_e) {
-      /* Dawn version may differ — cart still updated server-side */
+      /* section refresh optional */
+    }
+  }
+
+  async function addToCart(handle, btn) {
+    btn.disabled = true;
+    try {
+      const cartRoot = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
+      const productRes = await fetch(cartRoot + 'products/' + handle + '.js');
+      if (!productRes.ok) throw new Error('Could not load product');
+      const product = await productRes.json();
+      const variant =
+        (product.variants &&
+          product.variants.find(function (v) {
+            return v.available;
+          })) ||
+        (product.variants && product.variants[0]);
+      if (!variant) throw new Error('No variant available');
+
+      const sectionIds = getCartSectionIds();
+      const addRes = await fetch(cartRoot + 'cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          items: [{ id: variant.id, quantity: 1 }],
+          sections: sectionIds.join(','),
+          sections_url: window.location.pathname,
+        }),
+      });
+
+      const cartData = await addRes.json();
+      if (!addRes.ok || cartData.status) {
+        throw new Error(cartData.description || cartData.message || 'Could not add to cart');
+      }
+
+      if (!updateCartDrawer(cartData)) {
+        await refreshCartDrawerSections();
+        openCartDrawer();
+      }
+
+      showToast('Added to cart');
+    } catch (err) {
+      showToast(err.message || 'Could not add to cart', true);
+      console.error('[WishlistApp]', err);
+    } finally {
+      btn.disabled = false;
     }
   }
 
